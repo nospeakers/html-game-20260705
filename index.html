@@ -760,12 +760,17 @@
       const enemy = game.currentEnemy;
       const requiredAmt = enemy.attack;
       const log = (game.log || []).slice();
-      log.push(`${playerName(myId)} yields. ${enemy.rank}${enemy.suit} attacks for ${requiredAmt}.`);
+      log.push(`${playerName(myId)} yields. All players draw 1. ${enemy.rank}${enemy.suit} attacks for ${requiredAmt}.`);
+      let hands = { ...game.hands };
+      for (const pid of game.turnOrder) {
+        hands[pid] = (hands[pid] || []).slice();
+        hands[pid].push(randomCard());
+      }
 
-      const hand = game.hands[myId] || [];
+      const hand = hands[myId] || [];
       const handTotal = cardValueTotal(hand);
       let status = game.status;
-      let update = { log };
+      let update = { log, hands };
 
       if (requiredAmt <= 0) {
         update.currentTurn = (game.currentTurn + 1) % game.turnOrder.length;
@@ -980,14 +985,14 @@
 
       <h4>Enemy stats</h4>
       <ul>
-        <li>Jack — 10 attack, 20 health</li>
-        <li>Queen — 15 attack, 30 health</li>
-        <li>King — 20 attack, 40 health</li>
+        <li>Jack: 20 HP / 10 ATK</li>
+        <li>Queen: 30 HP / 15 ATK</li>
+        <li>King: 40 HP / 20 ATK</li>
       </ul>
 
       <h4>Turn sequence</h4>
       <ul>
-        <li>On your turn, play one card to attack the current enemy, or yield.</li>
+        <li>On your turn, play one card to attack the current enemy, or yield to allow all players to draw one.</li>
         <li>The card's suit power resolves (unless the enemy's suit matches the card's suit — royals are immune to their own suit).</li>
         <li>The card's value is dealt as damage. If it drops the enemy to 0 health or below, the enemy is defeated and the next one is revealed.</li>
         <li>If the enemy survives (or you yielded), it counterattacks: you must discard cards from your hand totaling at least its attack value. If you can't, the whole team loses.</li>
