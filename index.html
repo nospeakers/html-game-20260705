@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Regicide — Multiplayer</title>
+  <title>Regicide Multiplayer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap"
     rel="stylesheet">
@@ -468,20 +468,20 @@
     /* =========================================================================
        GAME CONSTANTS
        Simplifications vs. the official rules (kept deliberately out of scope):
-         - No combos (only ever one card played per turn)
-         - No Jokers / Jesters
-         - No "exact-kill" bonus (defeated enemies just go to the discard pile)
-         - No shared tavern deck — cards are drawn fully at random each time
+         - No combos (only ever one card played per turn) and no Ace companions
+         - No Jokers / Jesters (choose next player)
+         - TODO(royalty): No royalty (defeated enemies going into the discard)
+         - No "exact-kill" bonus (defeated enemies going to deck instead of discard)
+         - No shared tavern deck: cards are drawn fully at random each time
            (an "infinite" deck), so nothing needs to be stored or synced in
            Firebase for it, and there's no deck-depletion loss condition.
            Because of this, Hearts no longer "returns cards to the tavern deck"
-           (there isn't one) — instead it clears cards out of the discard pile.
+           (there isn't one) and instead clears cards out of the discard pile.
          - No max-hand-size cap enforcement on diamond draws
-         - No server-side validation / anti-cheat — this trusts connected clients,
-           which is fine for casual co-op play with friends but not for a public app
+         - TODO(singleplayer)
        ========================================================================= */
     const SUITS = ['♠', '♥', '♦', '♣'];
-    const RED_SUITS = ['♥', '♦'];
+    // const RED_SUITS = ['♥', '♦'];
     const SUIT_NAMES = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
     const ENEMY_RANKS = [
       { rank: 'J', health: 20, attack: 10 },
@@ -489,20 +489,11 @@
       { rank: 'K', health: 40, attack: 20 },
     ];
 
-    function shuffle(arr) {
-      const a = arr.slice();
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    }
-
-    // Draws one card completely at random (with replacement) from a full
-    // 2–10 + Ace, four-suit set. No deck is tracked, so duplicates across
-    // hands/draws are expected and fine.
+    // Draws one card completely at random from a full 2–10 + Ace, four-suit set.
+    // No deck is tracked, so duplicates across hands/draws are expected.
     function randomCard() {
       const suit = SUITS[Math.floor(Math.random() * SUITS.length)];
+      // TODO(royalty): add ranks for royalty, and only allow drawing defeated royalty.
       const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
       const rank = ranks[Math.floor(Math.random() * ranks.length)];
       const value = rank === 'A' ? 1 : parseInt(rank, 10);
@@ -515,6 +506,16 @@
       return hand;
     }
 
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // Jacks -> Queens -> Kings
     function buildCastleDeck() {
       let deck = [];
       for (const r of ENEMY_RANKS) {
@@ -523,9 +524,10 @@
         })));
         deck = deck.concat(group);
       }
-      return deck; // Jacks, then Queens, then Kings
+      return deck;
     }
 
+    // TODO(singleplayer)
     function startingHandSize(numPlayers) {
       const sizes = { 2: 7, 3: 6, 4: 5 };
       return sizes[numPlayers] || 5;
@@ -535,9 +537,9 @@
       return cards.reduce((s, c) => s + c.value, 0);
     }
 
-    // There's no stored deck, but the team still loses if all 40 cards worth
-    // of the original set are tied up in discard piles and hands at once —
-    // a stand-in for "the deck ran out" now that draws are fully random.
+    // There's no stored deck, but the team still loses if all 40 cards worth of the original set are tied up in discard piles and hands at once.
+    // This should actually be 41 (it's ok to have all 40 cards in play) but 41 is a weird number.
+    // TODO(royalty): Change this to totalCardsInPlayOK, which returns iff cards discardCount + hands > 40 + royaltyDefeated, when royalty gets added to the discard.
     function totalCardsInPlay(discardCount, hands) {
       const handsCount = Object.values(hands || {}).reduce((s, h) => s + h.length, 0);
       return (discardCount || 0) + handsCount;
@@ -566,7 +568,7 @@
     const myId = 'p_' + Math.random().toString(36).slice(2, 10);
     let myName = randomPlayerName();
     let roomCode = null;
-    let room = null;        // live cached copy of rooms/{roomCode}
+    let room = null;  // live cached copy of rooms/{roomCode}
     let selectedHandIdx = new Set();
     let roomRef = null;
 
@@ -586,6 +588,8 @@
       return out;
     }
 
+
+    // TODO: Check for a room with the same room code and if it exists, generate a new room code and try again.
     function createRoom() {
       if (!myName.trim()) return alert('Enter your name first.');
       roomCode = randomRoomCode();
@@ -596,6 +600,7 @@
       });
     }
 
+    // TODO: Let host allocate a new player to fill an empty seat if a player left the game.
     function joinRoom(code) {
       if (!myName.trim()) return alert('Enter your name first.');
       if (!code.trim()) return alert('Enter a room code.');
@@ -618,12 +623,14 @@
     function startGame() {
       const players = room.players || {};
       const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      // TODO(singleplayer)
       if (order.length < 2) { alert('Need at least 2 players to start.'); return; }
 
       const castleDeck = buildCastleDeck();
       const handSize = startingHandSize(order.length);
       const hands = {};
       order.forEach(pid => { hands[pid] = randomHand(handSize); });
+      // IFTTT(mulligan) TODO: Game is over from the start if no player has diamonds. Check that at least one diamond has been dealt, then remove the draw 1 when yielding.
       const currentEnemy = castleDeck.shift();
 
       const game = {
@@ -638,6 +645,8 @@
       };
       roomRef.child('game').set(game);
     }
+
+    // TODO: Add closeRoom(code).
 
     /* =========================================================================
        GAMEPLAY ACTIONS
@@ -664,7 +673,7 @@
       const log = (game.log || []).slice();
 
       if (immune) {
-        log.push(`${enemy.rank}${enemy.suit} is immune to ${SUIT_NAMES[card.suit]} — the suit power is blocked.`);
+        log.push(`${enemy.rank}${enemy.suit} is immune to ${SUIT_NAMES[card.suit]} -- the suit power is blocked.`);
       } else {
         if (card.suit === '♣') {
           damage *= 2;
@@ -672,7 +681,7 @@
         if (card.suit === '♥') {
           const n = Math.min(card.value, discardCount);
           discardCount -= n;
-          log.push(`${playerName(myId)} plays ${cardLabel(card)} — ${n} card(s) cleared from the discard pile.`);
+          log.push(`${playerName(myId)} plays ${cardLabel(card)} -- ${n} card(s) cleared from the discard pile.`);
         }
         if (card.suit === '♦') {
           let toDraw = card.value;
@@ -687,7 +696,7 @@
             toDraw--;
             i++;
           }
-          log.push(`${playerName(myId)} plays ${cardLabel(card)} — players draw cards.`);
+          log.push(`${playerName(myId)} plays ${cardLabel(card)} -- players draw cards.`);
         }
         if (card.suit === '♠') {
           spadeReduction = card.value;
@@ -699,7 +708,7 @@
       log.push(`${playerName(myId)} attacks ${enemy.rank}${enemy.suit} with ${cardLabel(card)} for ${damage} damage.`);
 
       if (enemy.health <= 0) {
-        // discardPile.push(enemy);
+        // TODO(royalty): discardPile.push(enemy);
         log.push(`${enemy.rank}${enemy.suit} is defeated!`);
         const castleDeck = (game.castleDeck || []).slice();
         const nextEnemy = castleDeck.shift();
@@ -711,9 +720,10 @@
           log.push(`Next enemy: ${nextEnemy.rank}${nextEnemy.suit}.`);
         }
         const nextTurn = (game.currentTurn + 1) % game.turnOrder.length;
+        // TODO(royalty): This is unnecessary because we don't put the enemy into the discardPile. Currently, totalCardsInPlay will not change when the Royalty is defeated.
         if (totalCardsInPlay(discardCount, hands) >= 40) {
           status = 'lost';
-          log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+          log.push('40 cards are now spread across discard piles and hands. The deck is exhausted and the realm is lost.');
         }
         roomRef.child('game').update({
           hands, discardCount, castleDeck,
@@ -743,7 +753,7 @@
         }
         if (status !== 'lost' && totalCardsInPlay(discardCount, hands) >= 40) {
           status = 'lost';
-          log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+          log.push('40 cards are now spread across discard piles and hands. The deck is exhausted and the realm is lost.');
           update.pendingDiscard = null;
         }
         update.status = status;
@@ -760,18 +770,22 @@
       const enemy = game.currentEnemy;
       const requiredAmt = enemy.attack;
       const log = (game.log || []).slice();
+      // IFTTT(mulligan)
       log.push(`${playerName(myId)} yields. All players draw 1. ${enemy.rank}${enemy.suit} attacks for ${requiredAmt}.`);
       let hands = { ...game.hands };
       for (const pid of game.turnOrder) {
         hands[pid] = (hands[pid] || []).slice();
         hands[pid].push(randomCard());
       }
+      // In theory, players could _already_ go over 40 cards here; yieldTurn should not be allowed to be clicked on if cards + players > 40.
+      // In practice we set pendingDiscard to the yielding player, wait for them to block, and then lose inside confirmDiscard. Surprise!
 
       const hand = hands[myId] || [];
       const handTotal = cardValueTotal(hand);
       let status = game.status;
       let update = { log, hands };
 
+      // TODO: Remove this conditional, requiredAmt will always be positive.
       if (requiredAmt <= 0) {
         update.currentTurn = (game.currentTurn + 1) % game.turnOrder.length;
         update.pendingDiscard = null;
@@ -807,10 +821,11 @@
       const log = (game.log || []).slice();
       log.push(`${playerName(myId)} discards ${chosen.length} card(s) to survive the counterattack.`);
 
+      // Consider moving check to the top of this function.
       let status = game.status;
       if (totalCardsInPlay(discardCount, hands) >= 40) {
         status = 'lost';
-        log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+        log.push('40 cards are now spread across discard piles and hands. The deck is exhausted and the realm is lost.');
       }
 
       const update = {};
@@ -899,6 +914,7 @@
     function renderLobby() {
       const players = room.players || {};
       const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      // TODO(singleplayer)
       appEl.innerHTML = `
     <div class="panel">
       <div class="room-code">${esc(roomCode)}</div>
@@ -958,7 +974,7 @@
     <div class="panel">
       <div class="status-line">
         ${iOwePendingDiscard ? `You must discard ${pendingDiscard.amount} damage worth of cards`
-          : (gameIsLost ? 'Defeated...' : (myTurn ? 'Your turn — play a card or yield' : `Waiting for ${esc(playerName(game.turnOrder[game.currentTurn]))}...`))}
+          : (gameIsLost ? 'Defeated...' : (myTurn ? 'Your turn: play a card or yield' : `Waiting for ${esc(playerName(game.turnOrder[game.currentTurn]))}...`))}
       </div >
         <div class="hand">
           ${myHand.map((c, i) => renderCard(c, i, {
@@ -981,7 +997,7 @@
       <summary>How to play</summary>
 
       <h4>Setup</h4>
-      <p>You're a team of adventurers taking on 12 royals — the Jacks, then Queens, then Kings — one at a time. Number cards (2–10 and Aces) are your pool of attack/defense cards.</p>
+      <p>You're a team of adventurers taking on 12 royals: the Jacks, then Queens, then Kings, one at a time. Number cards (2–10 and Aces) are your pool of attack/defense cards.</p>
 
       <h4>Enemy stats</h4>
       <ul>
@@ -993,21 +1009,43 @@
       <h4>Turn sequence</h4>
       <ul>
         <li>On your turn, play one card to attack the current enemy, or yield to allow all players to draw one.</li>
-        <li>The card's suit power resolves (unless the enemy's suit matches the card's suit — royals are immune to their own suit).</li>
+        <li>The card's suit power resolves (unless the enemy's suit matches the card's suit. Royals are immune to their own suit).</li>
         <li>The card's value is dealt as damage. If it drops the enemy to 0 health or below, the enemy is defeated and the next one is revealed.</li>
         <li>If the enemy survives (or you yielded), it counterattacks: you must discard cards from your hand totaling at least its attack value. If you can't, the whole team loses.</li>
-        <li>The team also loses if the discard pile and everyone's hands together ever reach 40 cards — the full deck is tied up and there's nothing left to play with.</li>
+        <li>The team also loses if the discard pile and everyone's hands together ever reach 40 cards: the full deck is tied up and there's nothing left to play with.</li>
       </ul>
     </details>
 
     <details class="rules-panel panel" open>
       <summary>Suit powers</summary>
 
-      <div class="suit-rule"><span class="suit-icon heart">♥</span>Hearts — clear that many cards out of the discard pile. This is your main way to hold off the 40-card loss condition, since it shrinks the discard pile back down.</div>
-      <div class="suit-rule"><span class="suit-icon diamond">♦</span>Diamonds — players draw that many cards, starting with you and going in turn order. A big diamond draw can push the team over the 40-card limit.</div>
-      <div class="suit-rule"><span class="suit-icon club">♣</span>Clubs — double the damage dealt to the enemy.</div>
-      <div class="suit-rule"><span class="suit-icon spade-desc">♠</span>Spades — reduce the damage you'll take from this enemy's counterattack.</div>
-      <p>A royal blocks the power of its own suit — for example, a Jack of Spades ignores any spade card played against it, though the card still deals its damage.</p>
+      <div class="suit-rule"><span class="suit-icon heart">♥</span>Hearts: clear that many cards out of the discard pile. This is your main way to hold off the 40-card loss condition, since it shrinks the discard pile back down.</div>
+      <div class="suit-rule"><span class="suit-icon diamond">♦</span>Diamonds: players draw that many cards, starting with you and going in turn order. A big diamond draw can push the team over the 40-card limit.</div>
+      <div class="suit-rule"><span class="suit-icon club">♣</span>Clubs: double the damage dealt to the enemy.</div>
+      <div class="suit-rule"><span class="suit-icon spade-desc">♠</span>Spades: reduce the damage you'll take from this enemy's counterattack.</div>
+      <p>A royal is IMMUNE to the power of its own suit. For example, a Jack of Spades ignores any spade card played against it, though the card still deals its damage.</p>
+    </details>
+
+    <details class="rules-panel panel">
+      <summary>Playing IRL</summary>
+      <p> Designed by Paul Abrahams, Luke Badger, and Andy Richdale.</p>
+      <ul>
+        <li> Yield no longer draws a card.
+        <li> Include both Jokers into the deck. At any point, discard a Joker to choose the next player to take their turn, and disable this Royalty's immunity.
+        <li> After dealing hands, place the remaining cards to form the "Tavern deck"
+        <li> When attacking or blocking, place the cards in a discard pile.
+        <li> Hearts remove cards from the discard pile and return them to the bottom of the "Tavern deck"
+        <li> Diamonds have no penalty for failing to draw from an empty Tavern deck.
+        <li> For 2 players, max hand size is 7, for 3 players max hand size is 6, for 4 players max hand size is 5.
+        <li> When a royalty is defeated, place it in the discard pile. For attack/defense/suit-power: Jack's value is 10, Queen's value is 15, King's value is 20.
+        <li> If royalty is defeated with exactly 0 health remaining, place them on the top of the Tavern deck instead.
+        <li> Aces are your "Animal companions" when played on attack, and are combined with a second card. Attack damage is the sum of cards played, and suit-power is BOTH the Ace and the second card's suit. e.g. if you play the Ace of Diamonds and a 7 of Clubs, you deal 16 damage=(7+1)*2, and you draw 8 cards.
+        <li> You can attack with pairs/3-of-a-kind/4-of-a-kind. Attack damage is the sum of cards played, and ALL suit-powers of the attack cards are combined. e.g. if you play 7 of spades, 7 of hearts, and 7 of diamonds, you deal 21 damage, you reduce damage by 21, return 21 cards from the discard to the Tavern deck, and draw 21 cards.
+      </ul>
+      <p>Optional rules:</p>
+      <ul>
+        <li> Players may not communicate until a Joker is played. They can only talk until the Royalty is defeated.
+        <li> 
     </details>
   `;
     }
