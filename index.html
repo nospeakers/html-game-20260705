@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regicide — Multiplayer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg: #14121a;
+      --panel: #1f1c29;
+      --panel-alt: #262233;
+      --gold: #c9a24b;
+      --gold-dim: #8a7038;
+      --parchment: #ece3d0;
+      /* --parchment-alt: #dfd5c0; */
+      --crimson: #cc79a7;
+      --scarlet: #c2533b;
+      --ink: #241f2e;
+      --charcoal: #56b4e9;
+      --muted: #948d7f;
+      --good: #6b9d6e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at top, #201c2b 0%, var(--bg) 60%);
+      color: var(--parchment);
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    .display {
+      font-family: 'Cinzel', serif;
+      letter-spacing: 0.03em;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+    }
+
+    header.title {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    header.title h1 {
+      font-size: 2rem;
+      color: var(--gold);
+      margin: 0 0 4px;
+      text-shadow: 0 0 18px rgba(201, 162, 75, 0.25);
+    }
+
+    header.title p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(201, 162, 75, 0.25);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type=text] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(201, 162, 75, 0.3);
+      background: var(--ink);
+      color: var(--parchment);
+      font-size: 1rem;
+      margin-bottom: 14px;
+    }
+
+    button {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 18px;
+      font-size: 0.9rem;
+      background: var(--gold);
+      color: #241f2e;
+      transition: transform 0.1s ease, background 0.15s ease;
+    }
+
+    button:hover {
+      background: #dab35d;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--gold);
+      border: 1px solid var(--gold-dim);
+    }
+
+    button.secondary:hover {
+      background: rgba(201, 162, 75, 0.1);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .row>* {
+      flex: 1;
+    }
+
+    .room-code {
+      font-family: 'Cinzel', serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      text-align: center;
+    }
+
+    .player-list {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0;
+    }
+
+    .player-list li {
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      background: var(--panel-alt);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+
+    .player-list li.active-turn {
+      outline: 1px solid var(--gold);
+      color: var(--gold);
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    /* Enemy banner */
+    .enemy-banner {
+      text-align: center;
+      padding: 18px;
+      background: linear-gradient(180deg, var(--parchment), var(--muted));
+      border: 1px solid var(--gold-dim);
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .enemy-rank {
+      font-size: 3rem;
+      font-family: 'Cinzel', serif;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .enemy-suit-heart {
+      color: var(--crimson);
+    }
+
+    .enemy-suit-diamond {
+      color: var(--scarlet);
+    }
+
+    .enemy-suit-spade {
+      color: var(--ink);
+    }
+
+    .enemy-suit-club {
+      color: var(--charcoal);
+    }
+
+    .enemy-meta {
+      color: var(--ink);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .healthbar-track {
+      height: 14px;
+      border-radius: 7px;
+      background: var(--ink);
+      border: 1px solid rgba(201, 162, 75, 0.3);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .healthbar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7a2a30, var(--crimson));
+      transition: width 0.3s ease;
+    }
+
+    .immune-tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #e0c07a;
+      border: 1px solid var(--ink);
+      border-radius: 4px;
+      padding: 2px 8px;
+    }
+
+    /* Cards */
+    .hand {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .card {
+      width: 56px;
+      height: 78px;
+      border-radius: 6px;
+      background: var(--parchment);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Cinzel', serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border: 2px solid transparent;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+    }
+
+    .card.selected {
+      border-color: var(--gold);
+      transform: translateY(-6px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    .card.heart {
+      color: var(--crimson);
+    }
+
+    .card.diamond {
+      /* background: var(--parchment-alt); */
+      color: var(--scarlet);
+    }
+
+    .card.spade {
+      color: var(--ink);
+    }
+
+    .card.club {
+      /* background: var(--parchment-alt); */
+      color: var(--charcoal);
+    }
+
+    .card .suit {
+      font-size: 1.3rem;
+      margin-top: 2px;
+    }
+
+    .card.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .card.disabled:hover {
+      transform: none;
+    }
+
+    .log {
+      background: var(--ink);
+      border-radius: 8px;
+      padding: 10px 12px;
+      max-height: 160px;
+      overflow-y: auto;
+      font-size: 0.82rem;
+      color: #cfc6b0;
+    }
+
+    .log div {
+      margin-bottom: 4px;
+    }
+
+    .status-line {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    .center-msg {
+      text-align: center;
+      padding: 30px 10px;
+    }
+
+    .center-msg h2 {
+      color: var(--gold);
+      font-size: 1.6rem;
+    }
+
+    .discard-note {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .selection-total {
+      font-size: 0.85rem;
+      margin-top: 6px;
+      color: var(--muted);
+    }
+
+    .selection-total.ok {
+      color: var(--good);
+    }
+
+    small.hint {
+      display: block;
+      color: var(--muted);
+      margin-top: -8px;
+      margin-bottom: 14px;
+    }
+
+    .rules-panel summary {
+      cursor: pointer;
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      font-size: 1rem;
+      outline: none;
+      list-style: none;
+    }
+
+    .rules-panel summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .rules-panel summary::before {
+      content: '▾ ';
+      display: inline-block;
+      color: var(--gold-dim);
+    }
+
+    .rules-panel[open] summary {
+      margin-bottom: 12px;
+    }
+
+    .rules-panel h4 {
+      font-family: 'Cinzel', serif;
+      color: var(--gold);
+      font-size: 0.9rem;
+      margin: 14px 0 6px;
+    }
+
+    .rules-panel p,
+    .rules-panel li {
+      font-size: 0.85rem;
+      color: #cfc6b0;
+      line-height: 1.5;
+    }
+
+    .rules-panel ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .suit-rule {
+      margin-bottom: 6px;
+    }
+
+    .suit-rule .suit-icon {
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    .suit-rule .suit-icon.heart {
+      color: var(--crimson);
+    }
+
+    .suit-rule .suit-icon.diamond {
+      color: var(--scarlet);
+    }
+
+    .suit-rule .suit-icon.spade {
+      color: var(--ink);
+    }
+
+    .suit-rule .suit-icon.spade-desc {
+      color: var(--parchment);
+    }
+
+    .suit-rule .suit-icon.club {
+      color: var(--charcoal);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="title">
+      <h1>Regicide</h1>
+      <p>2-4 player prototype</p>
+    </header>
+
+    <div id="app"></div>
+  </div>
+
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCD8a2ccFFgeDsD8kBDD2BbH3-pnWBCXgM",
+      authDomain: "github-game-b9e9d.firebaseapp.com",
+      databaseURL: "https://github-game-b9e9d-default-rtdb.firebaseio.com",
+      projectId: "github-game-b9e9d",
+      storageBucket: "github-game-b9e9d.firebasestorage.app",
+      messagingSenderId: "652233242090",
+      appId: "1:652233242090:web:ecef59819a3657862e6e93"
+    };
+
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const db = firebase.database();
+
+    /* =========================================================================
+       GAME CONSTANTS
+       Simplifications vs. the official rules (kept deliberately out of scope):
+         - No combos (only ever one card played per turn)
+         - No Jokers / Jesters
+         - No "exact-kill" bonus (defeated enemies just go to the discard pile)
+         - No shared tavern deck — cards are drawn fully at random each time
+           (an "infinite" deck), so nothing needs to be stored or synced in
+           Firebase for it, and there's no deck-depletion loss condition.
+           Because of this, Hearts no longer "returns cards to the tavern deck"
+           (there isn't one) — instead it clears cards out of the discard pile.
+         - No max-hand-size cap enforcement on diamond draws
+         - No server-side validation / anti-cheat — this trusts connected clients,
+           which is fine for casual co-op play with friends but not for a public app
+       ========================================================================= */
+    const SUITS = ['♠', '♥', '♦', '♣'];
+    const RED_SUITS = ['♥', '♦'];
+    const SUIT_NAMES = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
+    const ENEMY_RANKS = [
+      { rank: 'J', health: 20, attack: 10 },
+      { rank: 'Q', health: 30, attack: 15 },
+      { rank: 'K', health: 40, attack: 20 },
+    ];
+
+    function shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // Draws one card completely at random (with replacement) from a full
+    // 2–10 + Ace, four-suit set. No deck is tracked, so duplicates across
+    // hands/draws are expected and fine.
+    function randomCard() {
+      const suit = SUITS[Math.floor(Math.random() * SUITS.length)];
+      const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A'];
+      const rank = ranks[Math.floor(Math.random() * ranks.length)];
+      const value = rank === 'A' ? 1 : parseInt(rank, 10);
+      return { rank, suit, value };
+    }
+
+    function randomHand(size) {
+      const hand = [];
+      for (let i = 0; i < size; i++) hand.push(randomCard());
+      return hand;
+    }
+
+    function buildCastleDeck() {
+      let deck = [];
+      for (const r of ENEMY_RANKS) {
+        const group = shuffle(SUITS.map(suit => ({
+          rank: r.rank, suit, health: r.health, attack: r.attack, maxHealth: r.health
+        })));
+        deck = deck.concat(group);
+      }
+      return deck; // Jacks, then Queens, then Kings
+    }
+
+    function startingHandSize(numPlayers) {
+      const sizes = { 2: 7, 3: 6, 4: 5 };
+      return sizes[numPlayers] || 5;
+    }
+
+    function cardValueTotal(cards) {
+      return cards.reduce((s, c) => s + c.value, 0);
+    }
+
+    // There's no stored deck, but the team still loses if all 40 cards worth
+    // of the original set are tied up in discard piles and hands at once —
+    // a stand-in for "the deck ran out" now that draws are fully random.
+    function totalCardsInPlay(discardCount, hands) {
+      const handsCount = Object.values(hands || {}).reduce((s, h) => s + h.length, 0);
+      return (discardCount || 0) + handsCount;
+    }
+
+    function cardLabel(card) { return card.rank + card.suit; }
+
+    function rotateFrom(order, startIdx) {
+      const out = [];
+      for (let i = 0; i < order.length; i++) out.push(order[(startIdx + i) % order.length]);
+      return out;
+    }
+
+    /* =========================================================================
+       APP STATE
+       ========================================================================= */
+    const NAME_ADJECTIVES = ['Swift', 'Brave', 'Clever', 'Silent', 'Fierce', 'Nimble', 'Mighty', 'Sly', 'Gallant', 'Wild', 'Noble', 'Rusty', 'Shadow', 'Golden', 'Crimson', 'Frosty', 'Sneaky', 'Bold', 'Lucky', 'Grim'];
+    const NAME_ANIMALS = ['Fox', 'Wolf', 'Falcon', 'Badger', 'Otter', 'Raven', 'Lynx', 'Bear', 'Hawk', 'Panther', 'Viper', 'Owl', 'Boar', 'Heron', 'Ferret', 'Cobra', 'Eagle', 'Tiger', 'Wren'];
+
+    function randomPlayerName() {
+      const adj = NAME_ADJECTIVES[Math.floor(Math.random() * NAME_ADJECTIVES.length)];
+      const animal = NAME_ANIMALS[Math.floor(Math.random() * NAME_ANIMALS.length)];
+      return `${adj} ${animal}`;
+    }
+
+    const myId = 'p_' + Math.random().toString(36).slice(2, 10);
+    let myName = randomPlayerName();
+    let roomCode = null;
+    let room = null;        // live cached copy of rooms/{roomCode}
+    let selectedHandIdx = new Set();
+    let roomRef = null;
+
+    const appEl = document.getElementById('app');
+
+    function playerName(pid) {
+      return (room && room.players && room.players[pid] && room.players[pid].name) || pid;
+    }
+
+    /* =========================================================================
+       ROOM / LOBBY ACTIONS
+       ========================================================================= */
+    function randomRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let out = '';
+      for (let i = 0; i < 4; i++) out += chars[Math.floor(Math.random() * chars.length)];
+      return out;
+    }
+
+    function createRoom() {
+      if (!myName.trim()) return alert('Enter your name first.');
+      roomCode = randomRoomCode();
+      attachRoom();
+      roomRef.child('players/' + myId).set({
+        name: myName.trim(),
+        joinedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    function joinRoom(code) {
+      if (!myName.trim()) return alert('Enter your name first.');
+      if (!code.trim()) return alert('Enter a room code.');
+      roomCode = code.trim().toUpperCase();
+      attachRoom();
+      roomRef.child('players/' + myId).set({
+        name: myName.trim(),
+        joinedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    function attachRoom() {
+      roomRef = db.ref('rooms/' + roomCode);
+      roomRef.on('value', snap => {
+        room = snap.val();
+        render();
+      });
+    }
+
+    function startGame() {
+      const players = room.players || {};
+      const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      if (order.length < 2) { alert('Need at least 2 players to start.'); return; }
+
+      const castleDeck = buildCastleDeck();
+      const handSize = startingHandSize(order.length);
+      const hands = {};
+      order.forEach(pid => { hands[pid] = randomHand(handSize); });
+      const currentEnemy = castleDeck.shift();
+
+      const game = {
+        status: 'playing',
+        castleDeck, hands,
+        discardCount: 0,
+        turnOrder: order,
+        currentTurn: 0,
+        currentEnemy,
+        pendingDiscard: null,
+        log: [`Game started with ${order.length} players. First enemy: ${currentEnemy.rank}${currentEnemy.suit}.`]
+      };
+      roomRef.child('game').set(game);
+    }
+
+    /* =========================================================================
+       GAMEPLAY ACTIONS
+       ========================================================================= */
+    function isMyTurn(game) {
+      return game.turnOrder[game.currentTurn] === myId;
+    }
+
+    function playCard(idx) {
+      const game = room.game;
+      if (!isMyTurn(game)) return alert("It's not your turn.");
+      if (game.pendingDiscard) return alert('Resolve the pending discard first.');
+
+      let hand = (game.hands[myId] || []).slice();
+      const card = hand.splice(idx, 1)[0];
+      if (!card) return;
+
+      const enemy = { ...game.currentEnemy };
+      const immune = card.suit === enemy.suit;
+      let damage = card.value;
+      let discardCount = game.discardCount || 0;
+      let hands = { ...game.hands, [myId]: hand };
+      let spadeReduction = 0;
+      const log = (game.log || []).slice();
+
+      if (immune) {
+        log.push(`${enemy.rank}${enemy.suit} is immune to ${SUIT_NAMES[card.suit]} — the suit power is blocked.`);
+      } else {
+        if (card.suit === '♣') {
+          damage *= 2;
+        }
+        if (card.suit === '♥') {
+          const n = Math.min(card.value, discardCount);
+          discardCount -= n;
+          log.push(`${playerName(myId)} plays ${cardLabel(card)} — ${n} card(s) cleared from the discard pile.`);
+        }
+        if (card.suit === '♦') {
+          let toDraw = card.value;
+          const drawOrder = rotateFrom(game.turnOrder, game.currentTurn);
+          for (const pid of drawOrder) {
+            hands[pid] = (hands[pid] || []).slice();
+          }
+          let i = 0;
+          while (toDraw > 0) {
+            const pid = drawOrder[i % drawOrder.length];
+            hands[pid].push(randomCard());
+            toDraw--;
+            i++;
+          }
+          log.push(`${playerName(myId)} plays ${cardLabel(card)} — players draw cards.`);
+        }
+        if (card.suit === '♠') {
+          spadeReduction = card.value;
+        }
+      }
+
+      discardCount++;
+      enemy.health -= damage;
+      log.push(`${playerName(myId)} attacks ${enemy.rank}${enemy.suit} with ${cardLabel(card)} for ${damage} damage.`);
+
+      if (enemy.health <= 0) {
+        // discardPile.push(enemy);
+        log.push(`${enemy.rank}${enemy.suit} is defeated!`);
+        const castleDeck = (game.castleDeck || []).slice();
+        const nextEnemy = castleDeck.shift();
+        let status = 'playing';
+        if (!nextEnemy) {
+          status = 'won';
+          log.push('The last royal has fallen. Victory!');
+        } else {
+          log.push(`Next enemy: ${nextEnemy.rank}${nextEnemy.suit}.`);
+        }
+        const nextTurn = (game.currentTurn + 1) % game.turnOrder.length;
+        if (totalCardsInPlay(discardCount, hands) >= 40) {
+          status = 'lost';
+          log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+        }
+        roomRef.child('game').update({
+          hands, discardCount, castleDeck,
+          currentEnemy: nextEnemy || enemy,
+          currentTurn: nextTurn, status, log,
+          pendingDiscard: null
+        });
+      } else {
+        const requiredAmt = Math.max(0, enemy.attack - spadeReduction);
+        let status = game.status;
+        let update = { hands, discardCount, currentEnemy: enemy, log };
+
+        if (requiredAmt <= 0) {
+          log.push(`${enemy.rank}${enemy.suit} counterattacks, but spades reduce it to nothing.`);
+          update.currentTurn = (game.currentTurn + 1) % game.turnOrder.length;
+          update.pendingDiscard = null;
+        } else {
+          log.push(`${enemy.rank}${enemy.suit} counterattacks for ${requiredAmt}.`);
+          const handTotal = cardValueTotal(hands[myId]);
+          if (handTotal < requiredAmt) {
+            status = 'lost';
+            log.push(`${playerName(myId)} cannot discard enough and falls. The realm is lost.`);
+            update.pendingDiscard = null;
+          } else {
+            update.pendingDiscard = { playerId: myId, amount: requiredAmt };
+          }
+        }
+        if (status !== 'lost' && totalCardsInPlay(discardCount, hands) >= 40) {
+          status = 'lost';
+          log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+          update.pendingDiscard = null;
+        }
+        update.status = status;
+        roomRef.child('game').update(update);
+      }
+      selectedHandIdx.clear();
+    }
+
+    function yieldTurn() {
+      const game = room.game;
+      if (!isMyTurn(game)) return alert("It's not your turn.");
+      if (game.pendingDiscard) return alert('Resolve the pending discard first.');
+
+      const enemy = game.currentEnemy;
+      const requiredAmt = enemy.attack;
+      const log = (game.log || []).slice();
+      log.push(`${playerName(myId)} yields. ${enemy.rank}${enemy.suit} attacks for ${requiredAmt}.`);
+
+      const hand = game.hands[myId] || [];
+      const handTotal = cardValueTotal(hand);
+      let status = game.status;
+      let update = { log };
+
+      if (requiredAmt <= 0) {
+        update.currentTurn = (game.currentTurn + 1) % game.turnOrder.length;
+        update.pendingDiscard = null;
+      } else if (handTotal < requiredAmt) {
+        status = 'lost';
+        log.push(`${playerName(myId)} cannot discard enough and falls. The realm is lost.`);
+        update.pendingDiscard = null;
+      } else {
+        update.pendingDiscard = { playerId: myId, amount: requiredAmt };
+      }
+      update.status = status;
+      roomRef.child('game').update(update);
+      selectedHandIdx.clear();
+    }
+
+    function confirmDiscard() {
+      const game = room.game;
+      const pd = game.pendingDiscard;
+      if (!pd || pd.playerId !== myId) return;
+
+      const hand = game.hands[myId] || [];
+      const idxs = Array.from(selectedHandIdx).sort((a, b) => a - b);
+      const chosen = idxs.map(i => hand[i]);
+      const sum = cardValueTotal(chosen);
+      if (sum < pd.amount) {
+        alert(`Selected cards total ${sum}, need at least ${pd.amount}.`);
+        return;
+      }
+      const remaining = hand.filter((_, i) => !selectedHandIdx.has(i));
+      const discardCount = (game.discardCount || 0) + chosen.length;
+      const hands = { ...game.hands, [myId]: remaining };
+      const nextTurn = (game.currentTurn + 1) % game.turnOrder.length;
+      const log = (game.log || []).slice();
+      log.push(`${playerName(myId)} discards ${chosen.length} card(s) to survive the counterattack.`);
+
+      let status = game.status;
+      if (totalCardsInPlay(discardCount, hands) >= 40) {
+        status = 'lost';
+        log.push('40 cards are now spread across discard piles and hands — the deck is exhausted and the realm is lost.');
+      }
+
+      const update = {};
+      update['hands/' + myId] = remaining;
+      update['discardCount'] = discardCount;
+      update['pendingDiscard'] = null;
+      update['currentTurn'] = nextTurn;
+      update['log'] = log;
+      update['status'] = status;
+      roomRef.child('game').update(update);
+      selectedHandIdx.clear();
+      render();
+    }
+
+    function toggleCardSelect(idx) {
+      if (selectedHandIdx.has(idx)) selectedHandIdx.delete(idx);
+      else selectedHandIdx.add(idx);
+      render();
+    }
+
+    /* =========================================================================
+       RENDERING
+       ========================================================================= */
+    function esc(s) {
+      const d = document.createElement('div');
+      d.innerText = s;
+      return d.innerHTML;
+    }
+
+    function renderCard(card, idx, opts) {
+      opts = opts || {};
+      const classes = ['card'];
+      const suitClasses = { '♥': 'heart', '♦': 'diamond', '♠': 'spade', '♣': 'club' };
+      classes.push(suitClasses[card.suit]);
+      if (opts.selected) classes.push('selected');
+      if (opts.disabled) classes.push('disabled');
+      return `<div class="${classes.join(' ')}" ${opts.disabled ? '' : `onclick="${opts.onclick}"`}>
+    <div>${esc(card.rank)}</div>
+    <div class="suit">${card.suit}</div>
+  </div>`;
+    }
+
+    function render() {
+      if (!roomCode || !room) {
+        renderHome();
+        return;
+      }
+      if (!room.game) {
+        renderLobby();
+        return;
+      }
+      renderGame();
+      const logEl = document.querySelector('.log');
+      if (logEl) {
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    function renderHome() {
+      appEl.innerHTML = `
+    <div class="panel">
+      <label>Your name</label>
+      <input type="text" id="nameInput" placeholder="e.g. Alice" value="${esc(myName)}">
+    </div>
+    <div class="panel">
+      <label>Room code</label>
+      <div class="row">
+        <input type="text" id="joinCodeInput" placeholder="e.g. QK7T" style="text-transform:uppercase">
+        <button class="secondary" onclick="handleJoin()">Join room</button>
+      </div>
+      <button onclick="handleCreate()" style="width:100%;">Create new room</button>
+    </div>
+  `;
+    }
+
+    function handleCreate() {
+      myName = document.getElementById('nameInput').value;
+      createRoom();
+    }
+    function handleJoin() {
+      myName = document.getElementById('nameInput').value;
+      const code = document.getElementById('joinCodeInput').value;
+      joinRoom(code);
+    }
+
+    function renderLobby() {
+      const players = room.players || {};
+      const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      appEl.innerHTML = `
+    <div class="panel">
+      <div class="room-code">${esc(roomCode)}</div>
+      <p style="text-align:center; color:var(--muted); font-size:0.8rem;">share this code with the other player(s)</p>
+      <ul class="player-list">
+        ${order.map(pid => `<li>${esc(players[pid].name)} ${pid === myId ? '<span class="badge">(you)</span>' : ''}</li>`).join('')}
+      </ul>
+      <button ${order.length < 2 ? 'disabled' : ''} onclick="startGame()">Start game (${order.length}/4 joined, need 2+)</button>
+    </div>
+  `;
+    }
+
+    function renderGame() {
+      const game = room.game;
+      const enemy = game.currentEnemy;
+      const suitClassMap = { '♥': 'enemy-suit-heart', '♦': 'enemy-suit-diamond', '♠': 'enemy-suit-spade', '♣': 'enemy-suit-club' };
+      const enemySuitClass = suitClassMap[enemy.suit] || '';
+      const myTurn = isMyTurn(game);
+      const gameIsLost = game.status === 'lost';
+      const myHand = game.hands[myId] || [];
+      const pendingDiscard = game.pendingDiscard;
+      const iOwePendingDiscard = pendingDiscard && pendingDiscard.playerId === myId;
+
+      if (game.status === 'won') {
+        appEl.innerHTML = `<div class="center-msg"><h2>Victory!</h2><p>All twelve royals have been defeated.</p></div>`;
+        return;
+      }
+
+      const healthPct = Math.max(0, Math.round((enemy.health / enemy.maxHealth) * 100));
+
+      appEl.innerHTML = `
+    <div class="enemy-banner">
+      <div class="enemy-rank ${enemySuitClass}">${enemy.rank}${enemy.suit}</div>
+      <div class="enemy-meta">Health ${Math.max(0, enemy.health)} / ${enemy.maxHealth} &nbsp;·&nbsp; Attack ${enemy.attack}</div>
+      <div class="healthbar-track"><div class="healthbar-fill" style="width:${healthPct}%"></div></div>
+      <div class="immune-tag">Immune to ${SUIT_NAMES[enemy.suit]}</div>
+    </div>
+
+    <div class="panel">
+      <ul class="player-list">
+        ${game.turnOrder.map((pid, i) => `
+          <li class="${i === game.currentTurn ? 'active-turn' : ''}">
+            <span>${esc(playerName(pid))} ${pid === myId ? '(you)' : ''}</span>
+            <span class="badge">${(game.hands[pid] || []).length} cards ${i === game.currentTurn ? '· turn' : ''}</span>
+          </li>
+        `).join('')}
+      </ul>
+      <div class="badge">Discard pile: ${game.discardCount || 0} (${(game.discardCount || 0) + Object.values(game.hands || {}).reduce((s, h) => s + h.length, 0)})</div>
+    </div>
+
+    <div class="panel">
+      <div class="log">
+        ${(game.log || []).slice(-30).map(l => `<div>${esc(l)}</div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="status-line">
+        ${iOwePendingDiscard ? `You must discard ${pendingDiscard.amount} damage worth of cards`
+          : (gameIsLost ? 'Defeated...' : (myTurn ? 'Your turn — play a card or yield' : `Waiting for ${esc(playerName(game.turnOrder[game.currentTurn]))}...`))}
+      </div >
+        <div class="hand">
+          ${myHand.map((c, i) => renderCard(c, i, {
+            selected: selectedHandIdx.has(i),
+            disabled: gameIsLost || (iOwePendingDiscard ? false : !myTurn),
+            onclick: iOwePendingDiscard ? `toggleCardSelect(${i})` : `playCard(${i})`
+          })).join('')}
+        </div>
+      ${iOwePendingDiscard ? `
+        <div class="selection-total ${cardValueTotal(Array.from(selectedHandIdx).map(i => myHand[i])) >= pendingDiscard.amount ? 'ok' : ''}">
+          Selected: ${cardValueTotal(Array.from(selectedHandIdx).map(i => myHand[i]))} / ${pendingDiscard.amount}
+        </div>
+        <button onclick="confirmDiscard()" style="margin-top:10px;">Discard selected</button>
+      ` : `
+        <button class="secondary" ${myTurn && !gameIsLost ? '' : 'disabled'} onclick="yieldTurn()" style="margin-top:10px;">Yield turn</button>
+      `}
+    </div >
+
+    <details class="rules-panel panel" open>
+      <summary>How to play</summary>
+
+      <h4>Setup</h4>
+      <p>You're a team of adventurers taking on 12 royals — the Jacks, then Queens, then Kings — one at a time. Number cards (2–10 and Aces) are your pool of attack/defense cards.</p>
+
+      <h4>Enemy stats</h4>
+      <ul>
+        <li>Jack — 10 attack, 20 health</li>
+        <li>Queen — 15 attack, 30 health</li>
+        <li>King — 20 attack, 40 health</li>
+      </ul>
+
+      <h4>Turn sequence</h4>
+      <ul>
+        <li>On your turn, play one card to attack the current enemy, or yield.</li>
+        <li>The card's suit power resolves (unless the enemy's suit matches the card's suit — royals are immune to their own suit).</li>
+        <li>The card's value is dealt as damage. If it drops the enemy to 0 health or below, the enemy is defeated and the next one is revealed.</li>
+        <li>If the enemy survives (or you yielded), it counterattacks: you must discard cards from your hand totaling at least its attack value. If you can't, the whole team loses.</li>
+        <li>The team also loses if the discard pile and everyone's hands together ever reach 40 cards — the full deck is tied up and there's nothing left to play with.</li>
+      </ul>
+    </details>
+
+    <details class="rules-panel panel" open>
+      <summary>Suit powers</summary>
+
+      <div class="suit-rule"><span class="suit-icon heart">♥</span>Hearts — clear that many cards out of the discard pile. This is your main way to hold off the 40-card loss condition, since it shrinks the discard pile back down.</div>
+      <div class="suit-rule"><span class="suit-icon diamond">♦</span>Diamonds — players draw that many cards, starting with you and going in turn order. A big diamond draw can push the team over the 40-card limit.</div>
+      <div class="suit-rule"><span class="suit-icon club">♣</span>Clubs — double the damage dealt to the enemy.</div>
+      <div class="suit-rule"><span class="suit-icon spade-desc">♠</span>Spades — reduce the damage you'll take from this enemy's counterattack.</div>
+      <p>A royal blocks the power of its own suit — for example, a Jack of Spades ignores any spade card played against it, though the card still deals its damage.</p>
+    </details>
+  `;
+    }
+
+    render();
+  </script>
+</body>
+
+</html>
