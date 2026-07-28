@@ -646,7 +646,57 @@
       roomRef.child('game').set(game);
     }
 
-    // TODO: Add closeRoom(code).
+    function closeRoom() {
+      const players = room.players || {};
+      const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      const hostId = order[0];
+      if (myId !== hostId) {
+        alert('Only the host can close the room.');
+        return;
+      }
+      if (roomRef) {
+        roomRef.remove().then(() => {
+          roomCode = null;
+          room = null;
+          roomRef = null;
+          render();
+        }).catch(err => {
+          alert('Failed to close room: ' + err.message);
+        });
+      }
+    }
+
+    function retryGame() {
+      const players = room.players || {};
+      let order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      const hostId = order[0];
+      if (myId !== hostId) {
+        alert('Only the host can retry the game.');
+        return;
+      }
+
+      // Randomize the player order on reset
+      const randomizedOrder = shuffle(order);
+
+      const castleDeck = buildCastleDeck();
+      const handSize = startingHandSize(randomizedOrder.length);
+      const hands = {};
+      randomizedOrder.forEach(pid => { hands[pid] = randomHand(handSize); });
+      const currentEnemy = castleDeck.shift();
+
+      const game = {
+        status: 'playing',
+        castleDeck,
+        hands,
+        discardCount: 0,
+        turnOrder: randomizedOrder,
+        currentTurn: 0,
+        currentEnemy,
+        pendingDiscard: null,
+        log: [`Game restarted by host. Player order randomized. First enemy: ${currentEnemy.rank}${currentEnemy.suit}.`]
+      };
+      roomRef.child('game').set(game);
+    }
 
     /* =========================================================================
        GAMEPLAY ACTIONS
@@ -938,6 +988,11 @@
       const pendingDiscard = game.pendingDiscard;
       const iOwePendingDiscard = pendingDiscard && pendingDiscard.playerId === myId;
 
+      const players = room.players || {};
+      const order = Object.keys(players).sort((a, b) => (players[a].joinedAt || 0) - (players[b].joinedAt || 0));
+      const hostId = order[0];
+      const isHost = myId === hostId;
+
       if (game.status === 'won') {
         appEl.innerHTML = `<div class="center-msg"><h2>Victory!</h2><p>All twelve royals have been defeated.</p></div>`;
         return;
@@ -988,9 +1043,16 @@
           Selected: ${cardValueTotal(Array.from(selectedHandIdx).map(i => myHand[i]))} / ${pendingDiscard.amount}
         </div>
         <button onclick="confirmDiscard()" style="margin-top:10px;">Discard selected</button>
+      ` : (gameIsLost ? (isHost ? `
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+          <button onclick="retryGame()" style="flex: 1;">Retry Game</button>
+          <button class="secondary" onclick="closeRoom()" style="flex: 1;">Close Room</button>
+        </div>
       ` : `
+        <p style="font-size:0.85rem; color:var(--muted); text-align:center; margin-top:8px;">Waiting for host to retry or close room...</p>
+      `) : `
         <button class="secondary" ${myTurn && !gameIsLost ? '' : 'disabled'} onclick="yieldTurn()" style="margin-top:10px;">Yield turn</button>
-      `}
+      `)}
     </div >
 
     <details class="rules-panel panel" open>
